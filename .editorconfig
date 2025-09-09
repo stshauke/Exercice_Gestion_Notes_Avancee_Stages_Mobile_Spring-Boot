@@ -1,0 +1,27 @@
+﻿# Notes Suite (Monorepo)
+
+- ackend-spring/ — API Spring Boot (JWT, JPA, PostgreSQL)
+- web-frontend/ — React + TypeScript (Vite)
+- mobile-app/ — React Native (Expo)
+- docker/ — docker-compose.yml (PostgreSQL, pgAdmin, API)
+
+## Démarrage rapide
+- docker compose -f docker/docker-compose.yml up -d
+"@ | Out-File -FilePath ".\README.md" -Encoding UTF8
+
+# .editorconfig
+@"
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+
+[*.java]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false

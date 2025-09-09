@@ -1,0 +1,104 @@
+package com.acme.notes.security;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.security.config.Customizer;
+import java.time.Duration;
+
+import com.acme.notes.security.jwt.JwtAuthFilter;
+import com.acme.notes.user.User;
+import com.acme.notes.user.UserRepository;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import java.util.List;
+
+@Configuration
+@EnableMethodSecurity(prePostEnabled = true)
+public class SecurityConfig {
+
+  private final JwtAuthFilter jwtAuthFilter;
+  private final UserRepository userRepo;
+
+  public SecurityConfig(@Lazy JwtAuthFilter jwtAuthFilter, UserRepository userRepo) {
+    this.jwtAuthFilter = jwtAuthFilter;
+    this.userRepo = userRepo;
+  }
+
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http
+      .csrf(AbstractHttpConfigurer::disable)
+      
+      .cors(Customizer.withDefaults()).sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+      .authorizeHttpRequests(reg -> reg
+          .requestMatchers(HttpMethod.DELETE, "/api/v1/notes/**").authenticated()
+          .requestMatchers("/api/v1/auth/**", "/api/v1/health").permitAll()
+        .requestMatchers("/api/v1/health", "/api/v1/auth/**").permitAll()
+        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+        .requestMatchers("/api/v1/notes/**").authenticated()
+        .anyRequest().authenticated()
+      )
+      .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+    return http.build();
+  }
+
+  @Bean
+  public UserDetailsService userDetailsService() {
+    return username -> {
+      User u = userRepo.findByEmail(username).orElseThrow();
+      UserDetails ud = org.springframework.security.core.userdetails.User
+        .withUsername(u.getEmail())
+        .password(u.getPassword())
+        .authorities("ROLE_" + u.getRole().name())
+        .build();
+      return ud;
+    };
+  }
+
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public DaoAuthenticationProvider daoAuthenticationProvider() {
+    DaoAuthenticationProvider p = new DaoAuthenticationProvider();
+    p.setUserDetailsService(userDetailsService());
+    p.setPasswordEncoder(passwordEncoder());
+    return p;
+  }
+
+  @Bean
+  public AuthenticationManager authenticationManager() {
+    return new ProviderManager(List.of(daoAuthenticationProvider()));
+  }
+  // --- CORS global (autorise fetch depuis fichiers locaux / origines diverses)
+  @Bean
+  CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration c = new CorsConfiguration();
+    c.setAllowedOriginPatterns(java.util.List.of("*")); // accepte aussi origin: null
+    c.setAllowedMethods(java.util.List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+    c.setAllowedHeaders(java.util.List.of("Authorization","Content-Type","Accept","Origin","X-Requested-With"));
+    c.setAllowCredentials(false);
+    c.setMaxAge(java.time.Duration.ofHours(1));
+    UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
+    s.registerCorsConfiguration("/**", c);
+    return s;
+  }
+}

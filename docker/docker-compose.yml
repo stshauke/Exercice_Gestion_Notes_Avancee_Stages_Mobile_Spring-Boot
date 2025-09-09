@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16
+    container_name: notes-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: 
+      POSTGRES_PASSWORD: 
+      POSTGRES_DB: 
+      POSTGRES_PORT: 
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U  -d "]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: notes-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8082:80"
+    depends_on:
+      - db
+
+  api:
+    build:
+      context: ../backend-spring
+      dockerfile: Dockerfile
+    container_name: notes-api
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:\/\
+      SPRING_DATASOURCE_USERNAME: \
+      SPRING_DATASOURCE_PASSWORD: \
+      JWT_SECRET: \
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

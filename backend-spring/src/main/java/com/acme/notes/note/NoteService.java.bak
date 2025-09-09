@@ -1,0 +1,58 @@
+package com.acme.notes.note;
+
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.List;
+
+@Service
+public class NoteService {
+
+  private final NoteRepository repo;
+
+  public NoteService(NoteRepository repo) {
+    this.repo = repo;
+  }
+
+  // ---- LIST (fallback global vide) ----
+  public List<NoteViewDto> list() {
+    return java.util.Collections.emptyList();
+  }
+
+  // ---- LIST by owner ----
+  public List<NoteViewDto> listFor(String email) {
+    return repo.findByOwnerEmail(email).stream().map(NoteViewDto::from).toList();
+  }
+
+  // ---- CREATE ----
+  public NoteViewDto create(String email, NoteCreateDto dto) {
+    Note n = new Note();
+    n.setTitle(dto.title());
+    n.setContent(dto.content());
+    n.setOwnerEmail(email);
+    Instant now = Instant.now();
+    n.setCreatedAt(now);
+    n.setUpdatedAt(now);
+    n = repo.save(n);
+    return NoteViewDto.from(n);
+  }
+
+  // ---- UPDATE ----
+  public NoteViewDto update(String email, Long id, NoteUpdateDto dto) {
+    Note n = repo.findByIdAndOwnerEmail(id, email).orElseThrow();
+    if (dto.title() != null && !dto.title().isBlank()) {
+      n.setTitle(dto.title());
+    }
+    if (dto.content() != null && !dto.content().isBlank()) {
+      n.setContent(dto.content());
+    }
+    n.setUpdatedAt(Instant.now());
+    n = repo.save(n);
+    return NoteViewDto.from(n);
+  }
+
+  // ---- DELETE ----
+  public void delete(String email, Long id) {
+    repo.deleteByIdAndOwnerEmail(id, email);
+  }
+}

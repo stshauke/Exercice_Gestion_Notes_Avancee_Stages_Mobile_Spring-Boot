@@ -1,0 +1,24 @@
+﻿spring:
+  application:
+    name: notes-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/notes_db
+    username: notes_user
+    password: notes_pass
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: DEBUG

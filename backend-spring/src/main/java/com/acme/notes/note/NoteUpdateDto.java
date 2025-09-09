@@ -1,0 +1,3 @@
+package com.acme.notes.note;
+
+public record NoteUpdateDto(String title, String content) {}
