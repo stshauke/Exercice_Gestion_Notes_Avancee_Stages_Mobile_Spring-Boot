@@ -1,104 +1,115 @@
 package com.acme.notes.security;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.security.config.Customizer;
-import java.time.Duration;
 
 import com.acme.notes.security.jwt.JwtAuthFilter;
-import com.acme.notes.user.User;
-import com.acme.notes.user.UserRepository;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.time.Duration;
 import java.util.List;
 
 @Configuration
-@EnableMethodSecurity(prePostEnabled = true)
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-  private final JwtAuthFilter jwtAuthFilter;
-  private final UserRepository userRepo;
+    private final JwtAuthFilter jwtAuthFilter;
+    private final UserDetailsService userDetailsService;
 
-  public SecurityConfig(@Lazy JwtAuthFilter jwtAuthFilter, UserRepository userRepo) {
-    this.jwtAuthFilter = jwtAuthFilter;
-    this.userRepo = userRepo;
-  }
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // Désactivation CSRF (JWT → pas besoin de CSRF token)
+            .csrf(AbstractHttpConfigurer::disable)
 
-  @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http
-      .csrf(AbstractHttpConfigurer::disable)
-      
-      .cors(Customizer.withDefaults()).sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-      .authorizeHttpRequests(reg -> reg
-          .requestMatchers(HttpMethod.DELETE, "/api/v1/notes/**").authenticated()
-          .requestMatchers("/api/v1/auth/**", "/api/v1/health").permitAll()
-        .requestMatchers("/api/v1/health", "/api/v1/auth/**").permitAll()
-        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-        .requestMatchers("/api/v1/notes/**").authenticated()
-        .anyRequest().authenticated()
-      )
-      .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-    return http.build();
-  }
+            // Autorisations d’accès
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // prévol CORS
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/api/v1/debug/**").permitAll()
+                .requestMatchers("/api/v1/health").permitAll()
+                .anyRequest().authenticated()
+            )
 
-  @Bean
-  public UserDetailsService userDetailsService() {
-    return username -> {
-      User u = userRepo.findByEmail(username).orElseThrow();
-      UserDetails ud = org.springframework.security.core.userdetails.User
-        .withUsername(u.getEmail())
-        .password(u.getPassword())
-        .authorities("ROLE_" + u.getRole().name())
-        .build();
-      return ud;
-    };
-  }
+            // Pas de session côté serveur → API stateless
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
 
-  @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
+            // Gestion des erreurs 401 / 403
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req, res, e) -> {
+                    res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    res.setContentType("application/json");
+                    res.getWriter().write("{\"error\":\"Unauthorized\"}");
+                })
+                .accessDeniedHandler((req, res, e) -> {
+                    res.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    res.setContentType("application/json");
+                    res.getWriter().write("{\"error\":\"Forbidden\"}");
+                })
+            )
 
-  @Bean
-  public DaoAuthenticationProvider daoAuthenticationProvider() {
-    DaoAuthenticationProvider p = new DaoAuthenticationProvider();
-    p.setUserDetailsService(userDetailsService());
-    p.setPasswordEncoder(passwordEncoder());
-    return p;
-  }
+            // ✅ On force Spring à utiliser TON DaoAuthenticationProvider
+            .authenticationProvider(authenticationProvider())
 
-  @Bean
-  public AuthenticationManager authenticationManager() {
-    return new ProviderManager(List.of(daoAuthenticationProvider()));
-  }
-  // --- CORS global (autorise fetch depuis fichiers locaux / origines diverses)
-  @Bean
-  CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration c = new CorsConfiguration();
-    c.setAllowedOriginPatterns(java.util.List.of("*")); // accepte aussi origin: null
-    c.setAllowedMethods(java.util.List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
-    c.setAllowedHeaders(java.util.List.of("Authorization","Content-Type","Accept","Origin","X-Requested-With"));
-    c.setAllowCredentials(false);
-    c.setMaxAge(java.time.Duration.ofHours(1));
-    UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
-    s.registerCorsConfiguration("/**", c);
-    return s;
-  }
+            // Ajout du filtre JWT avant l’auth standard
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+
+            // Active CORS (via bean corsConfigurationSource)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Configuration CORS pour autoriser le frontend (Vite/React, etc.)
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(Duration.ofHours(1));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
 }

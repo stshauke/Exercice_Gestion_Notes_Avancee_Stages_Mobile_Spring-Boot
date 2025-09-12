@@ -1,0 +1,53 @@
+const BASE = "http://localhost:8080";
+
+async function request(path, opts = {}) {
+  const t = localStorage.getItem("token");
+  const headers = { "Content-Type": "application/json", ...(opts.headers||{}) };
+  if (t) headers.Authorization = Bearer \;
+  const res = await fetch(\\\\, { ...opts, headers });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(HTTP \: \);
+  }
+  return res.json();
+}
+
+export async function login(email, password) {
+  const res = await fetch(\\/api/v1/auth/login\, {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  if(!res.ok) throw new Error("login failed");
+  const body = await res.json();
+  localStorage.setItem("token", body.token);
+  return body;
+}
+
+export async function register(email,password,role) {
+  return fetch(\\/api/v1/auth/register\, {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ email,password,role })
+  });
+}
+
+export const Notes = {
+  list: ()=> request("/api/v1/notes"),
+  create: (n)=> request("/api/v1/notes",{method:"POST",body:JSON.stringify(n)}),
+  update: (id,n)=> request(\/api/v1/notes/\\,{method:"PUT",body:JSON.stringify(n)}),
+  remove: async(id)=> {
+    const t = localStorage.getItem("token");
+    const res = await fetch(\\/api/v1/notes/\\, {method:"DELETE", headers:{Authorization:Bearer \}});
+    return res;
+  }
+};
+
+export const PublicLinks = {
+  create: (noteId)=> request(\/api/v1/public-links/\\,{method:"POST"}),
+  get: (token)=> request(\/api/v1/public-links/\\)
+};
+
+export const Shares = {
+  create: (noteId, targetEmail)=> request(\/api/v1/shares/\?targetEmail=\\,{method:"POST"}),
+  myShares: ()=> request("/api/v1/shares/me"),
+  forNote: (noteId)=> request(\/api/v1/shares/note/\\)
+};

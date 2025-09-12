@@ -1,0 +1,46 @@
+package com.acme.notes.share;
+
+import com.acme.notes.note.Note;
+import com.acme.notes.note.NoteRepository;
+import com.acme.notes.user.User;
+import com.acme.notes.user.UserRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class ShareService {
+
+    private final ShareRepository repo;
+    private final NoteRepository noteRepo;
+    private final UserRepository userRepo;
+
+    public ShareService(ShareRepository repo, NoteRepository noteRepo, UserRepository userRepo) {
+        this.repo = repo;
+        this.noteRepo = noteRepo;
+        this.userRepo = userRepo;
+    }
+
+    public ShareDto createShare(Long noteId, String email, Permission permission, User owner) {
+        Note note = noteRepo.findByIdAndOwner(noteId, owner).orElseThrow();
+        User target = userRepo.findByEmail(email).orElseThrow();
+
+        Share s = new Share(note, target);
+        s.setPermission(permission);
+
+        return ShareDto.from(repo.save(s));
+    }
+
+    public List<ShareDto> listShares(Long noteId, User owner) {
+        Note note = noteRepo.findByIdAndOwner(noteId, owner).orElseThrow();
+        return repo.findByNote(note).stream()
+                .map(ShareDto::from)
+                .toList();
+    }
+
+    public void deleteShare(Long noteId, Long shareId, User owner) {
+        Note note = noteRepo.findByIdAndOwner(noteId, owner).orElseThrow();
+        Share s = repo.findByIdAndNote(shareId, note).orElseThrow();
+        repo.delete(s);
+    }
+}

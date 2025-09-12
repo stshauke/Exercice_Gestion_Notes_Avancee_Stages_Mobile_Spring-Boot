@@ -1,0 +1,21 @@
+package com.acme.notes.tag;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "tags")
+public class Tag {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true, length = 100)
+    private String label;
+
+    public Tag() {}
+    public Tag(String label) { this.label = label; }
+
+    public Long getId() { return id; }
+    public String getLabel() { return label; }
+    public void setLabel(String label) { this.label = label; }
+}

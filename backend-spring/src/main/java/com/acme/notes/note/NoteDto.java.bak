@@ -1,0 +1,10 @@
+package com.acme.notes.note;
+
+import com.acme.notes.share.Visibility;
+
+public record NoteDto(
+    Long id,
+    String title,
+    String contentMd,
+    Visibility visibility
+) {}

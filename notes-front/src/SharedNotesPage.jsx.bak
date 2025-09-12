@@ -1,0 +1,55 @@
+import React, { useEffect, useState } from "react";
+import { Shares } from "./lib/api";
+import { Shell } from "./App"; // on réutilise la mise en page
+
+export default function SharedNotesPage() {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const data = await Shares.myShares();
+        setNotes(data);
+      } catch (e) {
+        console.error("Erreur fetch shares:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  return (
+    <Shell>
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold">Notes partagées avec moi</h2>
+        <p className="text-sm text-slate-600">
+          Voici toutes les notes que d’autres utilisateurs ont partagées avec toi.
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="text-slate-600">Chargement…</div>
+      ) : notes.length === 0 ? (
+        <div className="rounded-2xl border bg-white p-6 text-center text-slate-600">
+          Aucune note partagée.
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {notes.map((n) => (
+            <div key={n.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+              <h3 className="font-semibold mb-2">{n.title}</h3>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                {n.content}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Partagée par : {n.ownerEmail}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </Shell>
+  );
+}

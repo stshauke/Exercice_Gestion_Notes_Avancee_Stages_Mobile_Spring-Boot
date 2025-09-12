@@ -1,10 +1,9 @@
 package com.acme.notes.security.jwt;
 
-import io.jsonwebtoken.Claims;
+import com.acme.notes.user.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -14,39 +13,70 @@ import java.util.Map;
 
 @Service
 public class JwtService {
-  private final Key key;
-  private final long validityMs;
 
-  public JwtService(
-      @Value("${JWT_SECRET:0123456789abcdef0123456789abcdef}") String secret,
-      @Value("${JWT_EXP_MINUTES:120}") long expMinutes) {
-    this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-    this.validityMs = expMinutes * 60_000;
-  }
+    // ⚠️ Mets ici une clé secrète vraiment longue et stockée dans application.properties
+    private static final String SECRET_KEY = "une_clef_ultra_longue_ultra_secrète_à_remplacer_par_env_var";
+    private static final long EXPIRATION = 1000 * 60 * 60 * 24; // 24h
 
-  public String generate(String subject, Map<String, Object> claims) {
-    long now = System.currentTimeMillis();
-    return Jwts.builder()
-      .setClaims(claims)
-      .setSubject(subject)
-      .setIssuedAt(new Date(now))
-      .setExpiration(new Date(now + validityMs))
-      .signWith(key, SignatureAlgorithm.HS256)
-      .compact();
-  }
+    private final Key key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
 
-  public String extractSubject(String token) {
-    return Jwts.parserBuilder().setSigningKey(key).build()
-      .parseClaimsJws(token).getBody().getSubject();
-  }
-
-  public boolean isValid(String token, String subject) {
-    try {
-      Claims c = Jwts.parserBuilder().setSigningKey(key).build()
-        .parseClaimsJws(token).getBody();
-      return subject.equals(c.getSubject()) && c.getExpiration().after(new Date());
-    } catch (Exception e) {
-      return false;
+    /**
+     * Générer un token JWT pour un utilisateur
+     */
+    public String generateToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getEmail())
+                .claim("role", user.getRole().name())
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
     }
-  }
+
+    /**
+     * Génération alternative : subject + claims custom
+     */
+    public String generate(String subject, Map<String, String> claims) {
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /**
+     * Extraire l'email (subject) d'un token
+     */
+    public String extractSubject(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+
+    /**
+     * Vérifier validité d’un token
+     */
+    public boolean isValid(String token, String email) {
+        try {
+            String subject = extractSubject(token);
+            return subject.equals(email) && !isExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isExpired(String token) {
+        Date exp = Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getExpiration();
+        return exp.before(new Date());
+    }
 }

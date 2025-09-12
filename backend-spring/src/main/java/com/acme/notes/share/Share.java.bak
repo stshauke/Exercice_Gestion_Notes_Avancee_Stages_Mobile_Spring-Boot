@@ -1,0 +1,36 @@
+package com.acme.notes.share;
+
+
+import com.acme.notes.note.Note;
+import com.acme.notes.user.User;
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "shares")
+public class Share {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "note_id")
+    private Note note;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "shared_with_user_id")
+    private User sharedWith;
+
+    @Column(nullable = false)
+    private String permission = "READ"; // pour l’instant seulement READ
+
+    public Share() {}
+    public Share(Note note, User sharedWith) {
+        this.note = note;
+        this.sharedWith = sharedWith;
+    }
+
+    public Long getId() { return id; }
+    public Note getNote() { return note; }
+    public User getSharedWith() { return sharedWith; }
+    public String getPermission() { return permission; }
+}

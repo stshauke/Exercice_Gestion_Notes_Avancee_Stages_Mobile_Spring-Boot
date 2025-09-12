@@ -1,0 +1,17 @@
+package com.acme.notes.share;
+
+public record ShareDto(
+    Long id,
+    Long noteId,
+    String sharedWithUserEmail,
+    String permission
+) {
+    public static ShareDto from(Share share) {
+        return new ShareDto(
+            share.getId(),
+            share.getNote().getId(),
+            share.getSharedWith().getEmail(),
+            share.getPermission().name()
+        );
+    }
+}

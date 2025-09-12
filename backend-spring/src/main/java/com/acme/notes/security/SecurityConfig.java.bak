@@ -1,4 +1,5 @@
 package com.acme.notes.security;
+
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.CorsConfiguration;
@@ -44,15 +45,14 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
       .csrf(AbstractHttpConfigurer::disable)
-      
-      .cors(Customizer.withDefaults()).sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+      .cors(Customizer.withDefaults())
+      .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(reg -> reg
           .requestMatchers(HttpMethod.DELETE, "/api/v1/notes/**").authenticated()
           .requestMatchers("/api/v1/auth/**", "/api/v1/health").permitAll()
-        .requestMatchers("/api/v1/health", "/api/v1/auth/**").permitAll()
-        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-        .requestMatchers("/api/v1/notes/**").authenticated()
-        .anyRequest().authenticated()
+          .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+          .requestMatchers("/api/v1/notes/**").authenticated()
+          .anyRequest().authenticated()
       )
       .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
     return http.build();
@@ -64,7 +64,7 @@ public class SecurityConfig {
       User u = userRepo.findByEmail(username).orElseThrow();
       UserDetails ud = org.springframework.security.core.userdetails.User
         .withUsername(u.getEmail())
-        .password(u.getPassword())
+        .password(u.getPasswordHash())
         .authorities("ROLE_" + u.getRole().name())
         .build();
       return ud;
@@ -84,19 +84,15 @@ public class SecurityConfig {
     return p;
   }
 
-  @Bean
-  public AuthenticationManager authenticationManager() {
-    return new ProviderManager(List.of(daoAuthenticationProvider()));
-  }
-  // --- CORS global (autorise fetch depuis fichiers locaux / origines diverses)
+  // --- CORS global
   @Bean
   CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration c = new CorsConfiguration();
-    c.setAllowedOriginPatterns(java.util.List.of("*")); // accepte aussi origin: null
+    c.setAllowedOriginPatterns(java.util.List.of("*"));
     c.setAllowedMethods(java.util.List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
     c.setAllowedHeaders(java.util.List.of("Authorization","Content-Type","Accept","Origin","X-Requested-With"));
     c.setAllowCredentials(false);
-    c.setMaxAge(java.time.Duration.ofHours(1));
+    c.setMaxAge(Duration.ofHours(1));
     UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
     s.registerCorsConfiguration("/**", c);
     return s;

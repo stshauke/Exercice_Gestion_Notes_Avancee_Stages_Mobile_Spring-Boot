@@ -1,0 +1,41 @@
+package com.acme.notes.share;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/shares")
+public class ShareController {
+
+  private final ShareService service;
+
+  public ShareController(ShareService service) {
+    this.service = service;
+  }
+
+  @GetMapping("/{noteId}")
+  public List<ShareDto> list(@AuthenticationPrincipal UserDetails me,
+                             @PathVariable Long noteId) {
+    return service.listShares(me.getUsername(), noteId);
+  }
+
+  @PostMapping("/{noteId}")
+  public ResponseEntity<ShareDto> create(@AuthenticationPrincipal UserDetails me,
+                                         @PathVariable Long noteId,
+                                         @RequestParam String email) {
+    var dto = service.createShare(me.getUsername(), noteId, email, Permission.READ);
+    return ResponseEntity.ok(dto);
+  }
+
+  @DeleteMapping("/{noteId}/{shareId}")
+  public ResponseEntity<Void> delete(@AuthenticationPrincipal UserDetails me,
+                                     @PathVariable Long noteId,
+                                     @PathVariable Long shareId) {
+    service.deleteShare(me.getUsername(), noteId, shareId);
+    return ResponseEntity.noContent().build();
+  }
+}

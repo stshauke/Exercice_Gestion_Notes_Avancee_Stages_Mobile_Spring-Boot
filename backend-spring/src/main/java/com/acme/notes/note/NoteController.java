@@ -1,62 +1,84 @@
 package com.acme.notes.note;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.DeleteMapping;
 
+import com.acme.notes.user.User;
+import com.acme.notes.user.UserRepository;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/notes")
 public class NoteController {
 
-  private final NoteService service;
+    private final NoteService service;
+    private final UserRepository userRepository;
 
-  public NoteController(NoteService service) {
-    this.service = service;
-  }
+    public NoteController(NoteService service, UserRepository userRepository) {
+        this.service = service;
+        this.userRepository = userRepository;
+    }
 
-  // Si connectÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© -> notes de l'utilisateur ; sinon -> liste globale (vide au dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©part)
-  @GetMapping
-public List<NoteViewDto> list(@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails ud) {
-  if (ud == null) return service.list(); // fallback (vide)
-  return service.listFor(ud.getUsername());
+    private User getCurrentUser(UserDetails userDetails) {
+        return userRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found: " + userDetails.getUsername()));
+    }
+
+    @GetMapping
+    public List<NoteDto> all(@AuthenticationPrincipal UserDetails userDetails) {
+        User user = getCurrentUser(userDetails);
+        return service.getNotes(user);
+    }
+
+    @PostMapping
+    public ResponseEntity<NoteDto> create(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody NoteCreateDto dto) {
+
+        User user = getCurrentUser(userDetails);
+
+        if (dto.title() == null || dto.title().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (dto.contentMd() == null || dto.contentMd().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        NoteDto created = service.create(user, dto);
+        return ResponseEntity.ok(created);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<NoteDto> one(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long id) {
+
+        User user = getCurrentUser(userDetails);
+        return service.getNote(user, id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<NoteDto> update(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long id,
+            @Valid @RequestBody NoteUpdateDto dto) {
+
+        User user = getCurrentUser(userDetails);
+        return service.update(user, id, dto)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+public ResponseEntity<Void> delete(@AuthenticationPrincipal User user,
+                                   @PathVariable Long id) {
+    service.delete(user, id);
+    return ResponseEntity.noContent().build();
 }
 
-  @PostMapping
-@org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
-public org.springframework.http.ResponseEntity<NoteViewDto> create(
-    @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails ud,
-    @org.springframework.web.bind.annotation.RequestBody NoteCreateDto dto) {
-  var saved = service.create(ud.getUsername(), dto);
-  return org.springframework.http.ResponseEntity
-      .created(java.net.URI.create("/api/v1/notes/" + saved.id()))
-      .body(saved);
-}
-
-  @PutMapping("/{id}")
-@org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
-public NoteViewDto update(
-    @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails ud,
-    @org.springframework.web.bind.annotation.PathVariable Long id,
-    @org.springframework.web.bind.annotation.RequestBody NoteUpdateDto dto) {
-  return service.update(ud.getUsername(), id, dto);
-}
-
-  
-  
-  
-  
-  @DeleteMapping("/{id}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@AuthenticationPrincipal UserDetails me, @PathVariable Long id) {
-    service.delete(me.getUsername(), id);
-  }
 }

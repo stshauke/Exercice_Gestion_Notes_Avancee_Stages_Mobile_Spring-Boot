@@ -1,62 +1,78 @@
+// src/main/java/com/acme/notes/note/NoteService.java
 package com.acme.notes.note;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
+import com.acme.notes.user.User;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class NoteService {
 
-  private final NoteRepository repo;
+    private final NoteRepository repo;
 
-  public NoteService(NoteRepository repo) {
-    this.repo = repo;
-  }
-
-  // ---- LIST (fallback global vide) ----
-  public List<NoteViewDto> list() {
-    return java.util.Collections.emptyList();
-  }
-
-  // ---- LIST by owner ----
-  public List<NoteViewDto> listFor(String email) {
-    return repo.findByOwnerEmail(email).stream().map(NoteViewDto::from).toList();
-  }
-
-  // ---- CREATE ----
-  public NoteViewDto create(String email, NoteCreateDto dto) {
-    Note n = new Note();
-    n.setTitle(dto.title());
-    n.setContent(dto.content());
-    n.setOwnerEmail(email);
-    Instant now = Instant.now();
-    n.setCreatedAt(now);
-    n.setUpdatedAt(now);
-    n = repo.save(n);
-    return NoteViewDto.from(n);
-  }
-
-  // ---- UPDATE ----
-  public NoteViewDto update(String email, Long id, NoteUpdateDto dto) {
-    Note n = repo.findByIdAndOwnerEmail(id, email).orElseThrow();
-    if (dto.title() != null && !dto.title().isBlank()) {
-      n.setTitle(dto.title());
+    public NoteService(NoteRepository repo) {
+        this.repo = repo;
     }
-    if (dto.content() != null && !dto.content().isBlank()) {
-      n.setContent(dto.content());
-    }
-    n.setUpdatedAt(Instant.now());
-    n = repo.save(n);
-    return NoteViewDto.from(n);
-  }
 
-  // ---- DELETE ----
-    public void delete(String email, Long id) {
-      // demo: pas de contrÃ´le dâ€™ownership
-      if (!repo.existsById(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-      repo.deleteById(id);
-  }
+    public List<NoteDto> getNotes(User owner) {
+        return repo.findByOwner(owner)
+                .stream()
+                .map(NoteDto::from)
+                .collect(Collectors.toList());
+    }
+
+    public Optional<NoteDto> getNote(User owner, Long id) {
+        return repo.findByIdAndOwner(id, owner).map(NoteDto::from);
+    }
+
+    public NoteDto create(User owner, NoteCreateDto dto) {
+        Note n = new Note();
+        n.setTitle(dto.title());
+        n.setContentMd(dto.contentMd());
+        n.setOwner(owner);
+
+        // Visibilité par défaut si non fournie
+        if (dto.visibility() == null) {
+            n.setVisibility(Visibility.PRIVATE);
+        } else {
+            n.setVisibility(dto.visibility());
+        }
+
+        // Dates
+        Instant now = Instant.now();
+        n.setCreatedAt(now);
+        n.setUpdatedAt(now);
+
+        return NoteDto.from(repo.save(n));
+    }
+
+    public Optional<NoteDto> update(User owner, Long id, NoteUpdateDto dto) {
+        return repo.findByIdAndOwner(id, owner).map(n -> {
+            if (dto.hasTitle()) {
+                n.setTitle(dto.title());
+            }
+            if (dto.hasContent()) {
+                n.setContentMd(dto.contentMd());
+            }
+            if (dto.hasVisibility()) {
+                n.setVisibility(dto.visibility());
+            }
+
+            // Mise à jour de la date
+            n.setUpdatedAt(Instant.now());
+
+            return NoteDto.from(repo.save(n));
+        });
+    }
+
+   public void delete(User owner, Long id) {
+    Note note = repo.findByIdAndOwner(id, owner)
+        .orElseThrow(() -> new RuntimeException("Note introuvable ou non autorisée"));
+    repo.delete(note);
+}
+
 }

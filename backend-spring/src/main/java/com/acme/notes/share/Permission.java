@@ -1,0 +1,6 @@
+package com.acme.notes.share;
+
+public enum Permission {
+    READ,
+    WRITE
+}
