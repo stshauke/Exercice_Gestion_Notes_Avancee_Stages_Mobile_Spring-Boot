@@ -105,23 +105,39 @@ export const Notes = {
 };
 
 // ---- PUBLIC LINKS ----
+// ---- PUBLIC LINKS ----
 export const PublicLinks = {
   create: (noteId) =>
-    jsonFetch(`/notes/${noteId}/shares?email=somebody@example.com&permission=READ`, {
+    jsonFetch(`/shares/public/${noteId}`, {
       method: "POST",
       headers: authHeaders(),
     }),
+  get: (token) => jsonFetch(`/shares/public/view/${token}`),
 };
+
+
+
+
 
 
 
 // ---- PRIVATE SHARES ----
+// ---- PRIVATE SHARES ----
 export const Shares = {
-  listMine: () => jsonFetch("/shares/mine", { headers: authHeaders() }),
-  shareWith: (noteId, email) =>
-    jsonFetch("/shares", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ noteId, email, permission: "READ" }),
-    }),
+  listMine: () => 
+    jsonFetch("/shares/mine", { headers: authHeaders() }),
+
+shareWith: (noteId, email) =>
+  jsonFetch(`/notes/${noteId}/shares?email=${encodeURIComponent(email)}&permission=READ`, {
+    method: "POST",
+    headers: authHeaders(),
+  }),
+
+
+  listAll: () =>
+    jsonFetch("/shares/all", { headers: authHeaders() }), // ✅ fix ici
 };
+
+
+
+

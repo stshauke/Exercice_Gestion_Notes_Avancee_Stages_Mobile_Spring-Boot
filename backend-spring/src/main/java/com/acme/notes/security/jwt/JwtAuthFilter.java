@@ -1,4 +1,3 @@
-// src/main/java/com/acme/notes/security/jwt/JwtAuthFilter.java
 package com.acme.notes.security.jwt;
 
 import com.acme.notes.user.User;
@@ -10,14 +9,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -48,30 +44,23 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                     if (isValid) {
                         User user = userRepository.findByEmail(email).orElse(null);
-                                System.out.println("✅ JWT OK pour user: " + user.getEmail() + " role=" + user.getRole());
-
                         if (user != null) {
-                            // ✅ On construit un vrai UserDetails avec ses rôles
-                            UserDetails userDetails = org.springframework.security.core.userdetails.User
-                                    .withUsername(user.getEmail())
-                                    .password(user.getPasswordHash())
-                                    .authorities("ROLE_" + user.getRole().name())
-                                    .build();
+                            System.out.println("✅ JWT OK pour user: " + user.getEmail() + " role=" + user.getRole());
 
+                            // Ici on utilise directement `user` car il implémente UserDetails
                             UsernamePasswordAuthenticationToken auth =
-    new UsernamePasswordAuthenticationToken(
-        user, // 👈 garde l'entité User comme principal
-        null,
-        List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
-    );
+                                    new UsernamePasswordAuthenticationToken(
+                                            user,
+                                            null,
+                                            user.getAuthorities()
+                                    );
 
                             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                             SecurityContextHolder.getContext().setAuthentication(auth);
-                        }
                         } else {
-        System.out.println("❌ User introuvable en DB pour: " + email);
-    }
-                    
+                            System.out.println("❌ User introuvable en DB pour: " + email);
+                        }
+                    }
                 }
             } catch (Exception e) {
                 System.out.println("JWT ERROR: " + e.getMessage());

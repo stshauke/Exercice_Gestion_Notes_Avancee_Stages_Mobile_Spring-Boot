@@ -40,12 +40,14 @@ public class SecurityConfig {
 
             // Autorisations d’accès
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // prévol CORS
-                .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/api/v1/debug/**").permitAll()
-                .requestMatchers("/api/v1/health").permitAll()
-                .anyRequest().authenticated()
-            )
+    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+    .requestMatchers("/api/v1/auth/**").permitAll()
+    .requestMatchers("/api/v1/debug/**").permitAll()
+    .requestMatchers("/api/v1/health").permitAll()
+    .requestMatchers("/api/v1/shares/public/**").permitAll() // ✅ autoriser les liens publics
+    .anyRequest().authenticated()
+)
+
 
             // Pas de session côté serveur → API stateless
             .sessionManagement(session ->

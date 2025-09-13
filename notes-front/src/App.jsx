@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, Link, useNavigate } from "react-router-dom";
 import { Plus, StickyNote, LogOut, Pencil, Trash2, Share2 } from "lucide-react";
 import PublicNotePage from "./PublicNotePage";
 import SharedNotesPage from "./SharedNotesPage";
-import { login, register, Notes, PublicLinks } from "./lib/api";
+import { login, register, Notes, PublicLinks, Shares } from "./lib/api";
 
 export function Protected({ children }) {
   const hasToken = !!localStorage.getItem("token");
@@ -258,10 +258,24 @@ function NotesPage() {
   }
 };
 
-  const shareNote = async (id) => {
+const shareNote = async (id) => {
+  const email = prompt(
+    "👉 Entrez l'email de l'utilisateur avec qui partager (laisser vide pour créer un lien public)"
+  );
+
+  if (!email) {
+    // 🔗 Partage public
     const pl = await PublicLinks.create(id);
     alert("Lien public: " + window.location.origin + "/public/" + pl.urlToken);
-  };
+  } else {
+    // 👥 Partage privé
+    await Shares.shareWith(id, email);
+    alert("✅ Note partagée en privé avec " + email);
+  }
+};
+
+
+
 
   return (
     <Shell>
@@ -287,42 +301,52 @@ function NotesPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {notes.map((n) => (
-            <div
-              key={n.id}
-              className="group rounded-2xl border bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="mb-2 flex items-start justify-between gap-3">
-                <h3 className="font-semibold truncate">{n.title}</h3>
-                <div className="opacity-80 group-hover:opacity-100 flex gap-1">
-                  <button
-                    title="Modifier"
-                    className="rounded-lg border p-1.5 hover:bg-slate-50"
-                    onClick={() => {
-                      setEditing(n);
-                      setModalOpen(true);
-                    }}
-                  >
-                    <Pencil className="size-4" />
-                  </button>
-                  <button
-                    title="Supprimer"
-                    className="rounded-lg border p-1.5 hover:bg-red-50"
-                    onClick={() => deleteNote(n.id)}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                  <button
-                    title="Partager"
-                    className="rounded-lg border p-1.5 hover:bg-blue-50"
-                    onClick={() => shareNote(n.id)}
-                  >
-                    <Share2 className="size-4" />
-                  </button>
-                </div>
-              </div>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap">{n.contentMd}</p>
-            </div>
-          ))}
+  <div
+    key={n.urlToken ? `public-${n.urlToken}` : `private-${n.id}`} // ✅ clé unique
+    className="group rounded-2xl border bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
+  >
+    <div className="mb-2 flex items-start justify-between gap-3">
+      <h3 className="font-semibold truncate">{n.title}</h3>
+      <div className="opacity-80 group-hover:opacity-100 flex gap-1">
+        <button
+          title="Modifier"
+          className="rounded-lg border p-1.5 hover:bg-slate-50"
+          onClick={() => {
+            setEditing(n);
+            setModalOpen(true);
+          }}
+        >
+          <Pencil className="size-4" />
+        </button>
+        <button
+          title="Supprimer"
+          className="rounded-lg border p-1.5 hover:bg-red-50"
+          onClick={() => deleteNote(n.id)}
+        >
+          <Trash2 className="size-4" />
+        </button>
+        <button
+          title="Partager"
+          className="rounded-lg border p-1.5 hover:bg-blue-50"
+          onClick={() => shareNote(n.id)}
+        >
+          <Share2 className="size-4" />
+        </button>
+      </div>
+    </div>
+    <p className="text-sm text-slate-700 whitespace-pre-wrap">{n.contentMd}</p>
+
+    {/* ✅ Petit badge pour montrer si c’est public ou privé */}
+    <div className="mt-2 text-xs">
+      {n.urlToken ? (
+        <span className="text-blue-600">🔗 Partage public</span>
+      ) : (
+        <span className="text-green-600">👥 Partage privé</span>
+      )}
+    </div>
+  </div>
+))}
+
         </div>
       )}
       <NoteModal

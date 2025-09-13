@@ -1,8 +1,9 @@
 package com.acme.notes.share;
 
-import com.acme.notes.user.User;
 import com.acme.notes.note.Note;
+import com.acme.notes.user.User;
 import jakarta.persistence.*;
+import java.time.Instant;
 
 @Entity
 public class Share {
@@ -17,10 +18,18 @@ public class Share {
     private User user;
 
     @Enumerated(EnumType.STRING)
-    private Permission permission = Permission.READ;
+    private Permission permission;
 
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt = Instant.now(); // ✅ ajouté
+
+    // --- Getters & setters ---
     public Long getId() {
         return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public Note getNote() {
@@ -45,5 +54,13 @@ public class Share {
 
     public void setPermission(Permission permission) {
         this.permission = permission;
+    }
+
+    public Instant getCreatedAt() {   // ✅ ajouté
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) { // ✅ si besoin
+        this.createdAt = createdAt;
     }
 }

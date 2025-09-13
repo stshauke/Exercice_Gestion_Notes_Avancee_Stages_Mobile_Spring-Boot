@@ -8,7 +8,13 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ShareRepository extends JpaRepository<Share, Long> {
-    Optional<Share> findByIdAndNote(Long id, Note note);
-    List<Share> findByUser(User user);
+
+    // Trouver tous les partages d'une note
     List<Share> findByNote(Note note);
+
+    // Trouver tous les partages pour un utilisateur
+    List<Share> findByUser(User user);
+
+    // Trouver un partage précis par son id et la note associée
+    Optional<Share> findByIdAndNote(Long id, Note note);
 }
